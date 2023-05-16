@@ -47,31 +47,28 @@ def get_predicted_date_by_invoices(invoices: List) -> List:
     return predicted_results
 
 
-def get_invoices_without_arrival_date(locations: List) -> List:
+@timing
+def get_invoices_without_arrival_date(locations: List) -> (List, List):
     """
     Формирование списка уникальных накладных для вагонов без указанной даты прибытия.
     """
-    return list(
-        set(
-            item["invoice"] for item in filter(
-                lambda x: x["arrivale_date"] is None,
-                locations
-            )
-        )
-    )
+    invoices = []
+    indices = []
+    for i, loc in enumerate(locations):
+        if loc["arrivale_date"] is None:
+            invoices.append(loc["arrivale_date"])
+            indices.append(i)
+    return invoices, indices
 
 
 @timing
-def refresh_locations(locations: List, predicted_data: List) -> List:
+def refresh_locations(locations: List, indices: List, predicted_data: List) -> List:
     """
     Обновление даты прибытия вагонов в соответствии с сервисом 'get_predicted_date_by_invoices'.
     """
-    for loc in locations:
-        if loc["arrivale_date"]:
-            continue
-        for data in predicted_data:
-            if loc["invoice"] == data["invoice"]:
-                loc["arrivale_date"] = data["predicted_date"]
+    for i, item in enumerate(indices):
+        if locations[item]["arrivale_date"] == predicted_data[i]["invoice"]:
+            locations[item]["arrivale_date"] = predicted_data[i]["predicted_date"]
     return locations
 
 
@@ -83,7 +80,7 @@ def api_call():
     только по вагоном, у которых она отсутствует
     """
     locations = get_current_dislocation()
-    invoices = get_invoices_without_arrival_date(locations)
+    invoices, indices = get_invoices_without_arrival_date(locations)
     predicted_data = get_predicted_date_by_invoices(invoices)
-    locations = refresh_locations(locations, predicted_data)
+    locations = refresh_locations(locations, indices, predicted_data)
     return locations
