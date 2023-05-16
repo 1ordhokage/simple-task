@@ -47,6 +47,34 @@ def get_predicted_date_by_invoices(invoices: List) -> List:
     return predicted_results
 
 
+def get_invoices_without_arrival_date(locations: List) -> List:
+    """
+    Формирование списка уникальных накладных для вагонов без указанной даты прибытия.
+    """
+    return list(
+        set(
+            item["invoice"] for item in filter(
+                lambda x: x["arrivale_date"] is None,
+                locations
+            )
+        )
+    )
+
+
+@timing
+def refresh_locations(locations: List, predicted_data: List) -> List:
+    """
+    Обновление даты прибытия вагонов в соответствии с сервисом 'get_predicted_date_by_invoices'.
+    """
+    for loc in locations:
+        if loc["arrivale_date"]:
+            continue
+        for data in predicted_data:
+            if loc["invoice"] == data["invoice"]:
+                loc["arrivale_date"] = data["predicted_date"]
+    return locations
+
+
 @timing
 def api_call():
     """
@@ -55,10 +83,7 @@ def api_call():
     только по вагоном, у которых она отсутствует
     """
     locations = get_current_dislocation()
-    # Получить список уникальных накладных из текущей дислокации только по тем вагонам,
-    # где arrivale_date = None
-    invoices = []
+    invoices = get_invoices_without_arrival_date(locations)
     predicted_data = get_predicted_date_by_invoices(invoices)
-
-    # Обновить оригинальный список вагонов данными, которые прислал сервис get_predicted_dates().
-    # Заменить вагоны, где arrivale_date = None на соответствующее поле predicted_date.    
+    locations = refresh_locations(locations, predicted_data)
+    return locations
